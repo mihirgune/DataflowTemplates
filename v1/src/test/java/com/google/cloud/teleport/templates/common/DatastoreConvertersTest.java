@@ -211,7 +211,7 @@ public class DatastoreConvertersTest implements Serializable {
 
     PAssert.that(results.get(goodTag)).containsInAnyOrder(entities.subList(1, entities.size()));
 
-    PCollection<Integer> stringHashCodes =
+    PCollection<Integer> errorTagHashCodes =
         results
             .get(errorTag)
             .apply(
@@ -224,12 +224,12 @@ public class DatastoreConvertersTest implements Serializable {
                       }
                     }));
 
-    List<Integer> errorHashCodes =
+    List<Integer> expectedErrorHashCodes =
         expectedErrors.stream()
             .map((x -> JsonParser.parseString(x).getAsJsonObject().hashCode()))
             .collect(Collectors.toList());
 
-    PAssert.that(stringHashCodes).containsInAnyOrder(errorHashCodes);
+    PAssert.that(errorTagHashCodes).containsInAnyOrder(expectedErrorHashCodes);
 
     pipeline.run();
   }
