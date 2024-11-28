@@ -29,6 +29,7 @@ import com.google.datastore.v1.Key;
 import com.google.datastore.v1.Key.PathElement;
 import com.google.datastore.v1.PartitionId;
 import com.google.datastore.v1.Value;
+import com.google.gson.JsonParser;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,7 +40,10 @@ import org.apache.beam.sdk.testing.NeedsRunner;
 import org.apache.beam.sdk.testing.PAssert;
 import org.apache.beam.sdk.testing.TestPipeline;
 import org.apache.beam.sdk.transforms.Create;
+import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.DoFnTester;
+import org.apache.beam.sdk.transforms.ParDo;
+import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.PCollectionTuple;
 import org.apache.beam.sdk.values.TupleTag;
 import org.junit.Assert;
@@ -206,7 +210,26 @@ public class DatastoreConvertersTest implements Serializable {
                 CheckSameKey.newBuilder().setGoodTag(goodTag).setErrorTag(errorTag).build());
 
     PAssert.that(results.get(goodTag)).containsInAnyOrder(entities.subList(1, entities.size()));
-    PAssert.that(results.get(errorTag)).containsInAnyOrder(expectedErrors);
+
+    PCollection<Integer> errorTagHashCodes =
+        results
+            .get(errorTag)
+            .apply(
+                ParDo.of(
+                    new DoFn<String, Integer>() {
+                      @ProcessElement
+                      public void processElement(
+                          @Element String jsonString, OutputReceiver<Integer> out) {
+                        out.output(JsonParser.parseString(jsonString).getAsJsonObject().hashCode());
+                      }
+                    }));
+
+    List<Integer> expectedErrorHashCodes =
+        expectedErrors.stream()
+            .map((x -> JsonParser.parseString(x).getAsJsonObject().hashCode()))
+            .collect(Collectors.toList());
+
+    PAssert.that(errorTagHashCodes).containsInAnyOrder(expectedErrorHashCodes);
 
     pipeline.run();
   }
